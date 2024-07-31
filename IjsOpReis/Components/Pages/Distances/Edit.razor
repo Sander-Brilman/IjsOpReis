@@ -1,0 +1,114 @@
+﻿@page "/distance/edit/{id:int}";
+@inject AppDbContext dbContext;
+@inject NavigationManager navManager;
+@inject AllowEditingService allowEditingService
+@rendermode NoPrerenderServer
+
+@if (message is not null)
+{
+    <div class="alert alert-primary">
+        @message
+    </div>
+}
+
+@if (distance is null)
+{
+    <p>Loading..</p>
+}
+else
+{
+    <h1>Aanpassen</h1>
+
+    <button class="btn btn-danger mb-4" @onclick="OnDelete">verwijderen</button>
+
+
+    <EditForm Model="distance" OnValidSubmit="OnSubmit">
+
+        <label class="d-block mb-2">
+            Aantal kilometers
+            <InputNumber min="0" @bind-Value="distance.Kilometers" class="form-control"></InputNumber>
+        </label>
+
+        <label class="d-block mb-2">
+            Start datum
+            <input type="datetime-local" class="form-control" @bind="distance.StartedAt" />
+        </label>
+
+        <label class="d-block mb-2">
+            Eind datum
+            <input type="datetime-local" class="form-control" @bind="distance.EndedAt" />
+        </label>
+
+        <button type="submit" class="btn btn-success">
+            Opslaan
+        </button>
+
+        <a href="/distance/" class="btn btn-outline-secondary">
+            Terug
+        </a>
+
+    </EditForm>
+}
+
+
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    string? message;
+
+    Distance? distance;
+
+    bool isEditingAllowed = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isEditingAllowed = allowEditingService.IsEditingAllowed();
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat momenteel uit..";
+            return;
+        }
+
+        distance = await dbContext.Distances.FindAsync(Id);
+    }
+
+    int deleteCount = 0;
+
+    async Task OnSubmit()
+    {
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat nogsteeds uit..";
+            return;
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        message = $"Veranderingen aan afstand opgeslagen";
+    }
+
+    async Task OnDelete()
+    {
+        if (deleteCount < 2)
+        {
+            deleteCount++;
+            return;
+        }
+
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat nogsteeds uit, ook voor verwijderen";
+            return;
+        }
+
+        dbContext.Distances.Remove(distance!);
+        await dbContext.SaveChangesAsync();
+
+        distance = null;
+        await InvokeAsync(StateHasChanged);
+
+        navManager.NavigateTo("/distance/");
+    }
+}

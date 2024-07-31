@@ -1,0 +1,123 @@
+﻿@page "/icecream/{id:int}";
+@inject AppDbContext dbContext;
+@inject NavigationManager navManager;
+@inject AllowEditingService allowEditingService
+@rendermode NoPrerenderServer
+
+@if (message is not null)
+{
+    <div class="alert alert-primary">
+        @message
+    </div>
+}
+
+@if (icecreamRecord is null)
+{
+    <p>Loading..</p>
+}
+else
+{
+    <h1>Aanpassen</h1>
+
+    <button class="btn btn-danger mb-4" @onclick="OnDelete">verwijderen</button>
+
+
+    <EditForm Model="icecreamRecord" OnValidSubmit="OnSubmit">
+
+        <label class="d-block mb-2">
+            Smaak
+            <InputText class="form-control" @bind-Value="icecreamRecord.Flavor" />
+        </label>
+
+        <label class="d-block mb-2">
+            Aantal
+            <InputNumber step="0.5" class="form-control" @bind-Value="icecreamRecord.Amount" />
+        </label>
+
+        <label class="d-block mb-2">
+            Locatie
+            <InputText class="form-control" @bind-Value="icecreamRecord.Location" />
+        </label>
+
+        <label class="d-block mb-2">
+            Winkel
+            <InputText class="form-control" @bind-Value="icecreamRecord.Shop" />
+        </label>
+
+        <label class="d-block mb-2">
+            Datum
+            <input type="datetime-local" class="form-control" @bind="icecreamRecord.EatenAt" />
+        </label>
+
+        <button type="submit" class="btn btn-success">
+            Opslaan
+        </button>
+        <a href="/" class="btn btn-outline-secondary">
+            Terug naar lijst
+        </a>
+
+    </EditForm>
+}
+
+
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    string? message;
+
+    IcecreamRecord? icecreamRecord;
+
+    bool isEditingAllowed = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isEditingAllowed = allowEditingService.IsEditingAllowed();
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat momenteel uit..";
+            return;
+        }
+
+        icecreamRecord = await dbContext.IceCreamRecords.FindAsync(Id);
+    }
+
+    int deleteCount = 0;
+
+    async Task OnSubmit()
+    {
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat nogsteeds uit..";
+            return;
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        message = $"Veranderingen aan {icecreamRecord!.Flavor} ijsje opgeslagen!";
+    }
+
+    async Task OnDelete()
+    {
+        if (deleteCount < 2)
+        {
+            deleteCount++;
+            return;
+        }
+
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat nogsteeds uit, ook voor verwijderen";
+            return;
+        }
+
+        dbContext.IceCreamRecords.Remove(icecreamRecord!);
+        await dbContext.SaveChangesAsync();
+
+        icecreamRecord = null;
+        await InvokeAsync(StateHasChanged);
+
+        navManager.NavigateTo("/");
+    }
+}

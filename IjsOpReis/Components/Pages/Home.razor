@@ -1,5 +1,6 @@
 ﻿@page "/"
 @inject IDbContextFactory<AppDbContext> dbContextfactory;
+@inject  AllowEditingService allowEditingService;
 @rendermode NoPrerenderServer
 @using IjsOpReis.Extentions
 @using Microsoft.AspNetCore.Components.QuickGrid
@@ -9,7 +10,9 @@
 
 <h1>Ijs op Reis bolletjes collectie!</h1>
 
-<a href="add" class="btn btn-success">Toevoegen</a>
+@if (allowEditingService.IsEditingAllowed()) {
+    <a href="add" class="btn btn-success">Toevoegen</a>
+}
 
 <hr />
 <h2 class="h3">Totaal aantal kilometers: @totalKilometers km</h2>
@@ -52,9 +55,11 @@
         <PropertyColumn Property="x => x.Location" Title="Stad" Sortable="true"></PropertyColumn>
         <PropertyColumn Property="x => x.Shop" Title="Winkel" Sortable="true"></PropertyColumn>
         <PropertyColumn Property="x => x.EatenAt" Title="Wanneer opgegeten" Sortable="true"></PropertyColumn>
-        <TemplateColumn Context="x">
-            <a href="/icecream/@x.Id" class="btn btn-sm btn-outline-primary">Aanpassen</a>
-        </TemplateColumn>
+        @if (allowEditingService.IsEditingAllowed()) {
+            <TemplateColumn Context="x">
+                <a href="/icecream/@x.Id" class="btn btn-sm btn-outline-primary">Aanpassen</a>
+            </TemplateColumn>
+        }
     </QuickGrid>
 }
 

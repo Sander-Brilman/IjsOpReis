@@ -3,8 +3,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IjsOpReis.Data;
 
-public class AppDbContext(DbContextOptions options) : DbContext(options)
+public class AppDbContext : DbContext
 {
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+    }
+
     public DbSet<IcecreamRecord> IceCreamRecords { get; set; }
 
     public DbSet<Distance> Distances { get; set; }

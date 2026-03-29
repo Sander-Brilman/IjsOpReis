@@ -1,7 +1,9 @@
 ﻿@page "/"
+@rendermode NoPrerenderServer
+
 @inject IDbContextFactory<AppDbContext> dbContextfactory;
 @inject  AllowEditingService allowEditingService;
-@rendermode NoPrerenderServer
+
 @using IjsOpReis.Extentions
 @using Microsoft.AspNetCore.Components.QuickGrid
 @using Microsoft.EntityFrameworkCore

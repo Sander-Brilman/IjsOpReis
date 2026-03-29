@@ -1,0 +1,44 @@
+
+volumes:
+  db-data:
+
+secrets:
+  db-password:
+    file: ./db-password.txt
+
+
+services:
+  server:
+    build:
+      context: ./IjsOpReis/
+      target: final
+    ports:
+      - 8080:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DBConnectionString: "Host=db;Database=IjsOpReis;Username=postgres"
+      DBPasswordFile: "/run/secrets/db-password"
+      AllowEditing: "true"
+    secrets:
+      - db-password
+ 
+  db:
+    image: postgres:18
+    restart: always
+    user: postgres
+    secrets:
+      - db-password
+    volumes:
+      - db-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_DB=IjsOpReis
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5

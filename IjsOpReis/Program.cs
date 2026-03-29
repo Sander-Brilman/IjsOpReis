@@ -10,15 +10,17 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddSingleton<AllowEditingService>();
-
 builder.Services.AddQuickGridEntityFrameworkAdapter();
 
+string connectionString = GetConnectionStringFromEnv(builder);
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("IjsOpReisConnectionString"));
+    options.UseNpgsql(connectionString);
 });
 
 var app = builder.Build();
+
+PerformDatabaseMigration(app);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -28,12 +30,28 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-
-app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static void PerformDatabaseMigration(WebApplication app)
+{
+    Console.WriteLine("Migrating database");
+    using (var scope = app.Services.CreateScope())
+    {
+        AppDbContext dbContext = app.Services.GetRequiredService<AppDbContext>();
+        dbContext.Database.Migrate();
+    }
+    Console.WriteLine("Finished migrating database");
+}
+
+static string GetConnectionStringFromEnv(WebApplicationBuilder builder)
+{
+    string password = builder.Configuration.GetValue<string>("DBPassword") ?? File.ReadAllText(builder.Configuration.GetValue<string>("DBPasswordFile")!)!;
+    string connectionString = builder.Configuration.GetValue<string>("DBConnectionString")! + ";Password=" + password;
+    return connectionString;
+}

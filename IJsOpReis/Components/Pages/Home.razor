@@ -1,0 +1,150 @@
+﻿@page "/"
+@inject IDbContextFactory<AppDbContext> dbContextfactory;
+@inject  AllowEditingService allowEditingService;
+
+<PageTitle>Home</PageTitle>
+
+<h1>Ijs op Reis bolletjes collectie!</h1>
+
+@if (allowEditingService.IsEditingAllowed()) {
+    <a href="add" class="btn btn-success">Toevoegen</a>
+}
+
+<hr />
+<h2 class="h3">Totaal aantal kilometers: @totalKilometers km</h2>
+<h2 class="h3">Jaar met meeste kilometers: @longestDistance.StartedAt.Year (@longestDistance.Kilometers km in @longestDistance.AmountOfDays dagen)</h2>
+<h2 class="h3">Jaar met meeste ijsjes: @yearWithMostScoops.year (@yearWithMostScoops.scoops in @yearWithMostScoops.days dagen)</h2>
+<hr />
+<h2 class="h3">Totaal aantal bolletjes: @totalScoops</h2>
+<h2 class="h3">Totaal aantal unieke smaken: @totalFlavors</h2>
+<h2 class="h3">Totaal aantal Winkels: @totalShops</h2>
+<h2 class="h3">Totaal aantal Steden: @totalCities</h2>
+<hr />
+<h2 class="h3">Favorite smaaken</h2>
+
+<ul>
+    @foreach ((string flavor, decimal amountOfScoops) in favoriteFlavors)
+    {
+        <li>[@amountOfScoops] @flavor</li>
+    }
+</ul>
+<button class="mb-3 btn btn-sm btn-outline-primary" @onclick="ToggleLargeFlavorView">Meer / Minder</button>
+
+<h2 class="h3">Meeste bolletjes gegeten bij</h2>
+<ul>
+    @foreach ((string name, string[] locations, decimal amountOfScoops) in favoriteShops)
+    {
+        string displayLocations = string.Join(", ", locations);
+
+        <li>[@amountOfScoops] @name (@displayLocations)</li>
+    }
+</ul>
+<button class="mb-3 btn btn-sm btn-outline-primary" @onclick="ToggleLargeShopView">Meer / Minder</button>
+<hr />
+
+
+@if (loadGrid && dbContext is not null)
+{
+    <QuickGrid Items="dbContext.IceCreamRecords">
+        <PropertyColumn Property="x => x.Flavor" Title="Smaak" Sortable="true"></PropertyColumn>
+        <PropertyColumn Property="x => x.Amount" Title="Aantal bolletjes" Sortable="true"></PropertyColumn>
+        <PropertyColumn Property="x => x.Location" Title="Stad" Sortable="true"></PropertyColumn>
+        <PropertyColumn Property="x => x.Shop" Title="Winkel" Sortable="true"></PropertyColumn>
+        <PropertyColumn Property="x => x.EatenAt" Title="Wanneer opgegeten" Sortable="true"></PropertyColumn>
+        @if (allowEditingService.IsEditingAllowed()) {
+            <TemplateColumn Context="x">
+                <a href="/icecream/@x.Id" class="btn btn-sm btn-outline-primary">Aanpassen</a>
+            </TemplateColumn>
+        }
+    </QuickGrid>
+}
+
+
+@code {
+    AppDbContext? dbContext;
+
+    decimal totalScoops;
+    int totalShops;
+    int totalCities;
+    int totalFlavors;
+
+    int totalKilometers;
+    Distance longestDistance = new();
+
+    bool loadGrid = false;
+
+    YearWithMostScoops yearWithMostScoops = new(0, 0, 0);
+
+    FavoriteFlavor[] favoriteFlavors = [];
+
+    FavoriteShop[] favoriteShops = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        dbContext = await dbContextfactory.CreateDbContextAsync();
+
+        totalKilometers = await dbContext.Distances.SumAsync(a => a.Kilometers);
+        longestDistance = await dbContext.Distances.OrderByDescending(a => a.Kilometers).FirstAsync();
+
+        totalScoops = await dbContext.IceCreamRecords.SumAsync(i => i.Amount);
+        totalShops = await dbContext.IceCreamRecords.GroupBy(i => i.Shop).CountAsync();
+        totalCities = await dbContext.IceCreamRecords.GroupBy(i => i.Location).CountAsync();
+        totalFlavors = await dbContext.IceCreamRecords.GroupBy(i => i.Flavor).CountAsync();
+
+        yearWithMostScoops = await dbContext.IceCreamRecords
+            .GroupBy(i => i.EatenAt.Year)
+            .OrderByDescending(i => i.Sum(a => a.Amount))
+            .Select(x => new YearWithMostScoops(x.Key, x.Sum(a => a.Amount), (int)(x.OrderByDescending(xx => xx.EatenAt).First().EatenAt - x.OrderBy(xx => xx.EatenAt).First().EatenAt).TotalDays + 1 ))
+            .FirstAsync();
+
+        await LoadFavoriteFlavors(5);
+        await LoadFavoriteShops(5);
+
+        loadGrid = true;
+    }
+
+    public record FavoriteFlavor(string Flavor, decimal ScoopsEaten);
+
+    async Task LoadFavoriteFlavors(int rows)
+    {
+        favoriteFlavors = await dbContext!.IceCreamRecords
+            .GroupBy(i => i.Flavor)
+            .OrderByDescending(i => i.Sum(a => a.Amount))
+            .Select(i => new FavoriteFlavor(i.Key, i.Sum(a => a.Amount)))
+            .Take(rows)
+            .ToArrayAsync();
+    }
+
+    private async Task ToggleLargeFlavorView(MouseEventArgs e)
+    {
+        int rows = favoriteFlavors.Length == 5
+            ? int.MaxValue
+            : 5;
+        await LoadFavoriteFlavors(rows);
+    }
+
+
+
+    public record FavoriteShop(string ShopName, string[] locations, decimal ScoopsEaten);
+
+    async Task LoadFavoriteShops(int rows)
+    {
+        favoriteShops = await dbContext!.IceCreamRecords
+            .GroupBy(i => i.Shop)
+            .OrderByDescending(i => i.Sum(a => a.Amount))
+            .Select(i => new FavoriteShop(i.Key, i.Select(i => i.Location).Distinct().ToArray(), i.Sum(a => a.Amount)))
+            .Take(rows)
+            .ToArrayAsync();
+    }
+
+    private async Task ToggleLargeShopView(MouseEventArgs e)
+    {
+        int rows = favoriteShops.Length == 5
+            ? int.MaxValue
+            : 5;
+        await LoadFavoriteShops(rows);
+
+    }
+
+    public record YearWithMostScoops(int year, decimal scoops, int days);
+}

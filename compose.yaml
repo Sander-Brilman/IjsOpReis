@@ -10,7 +10,7 @@ secrets:
 services:
   server:
     build:
-      context: ./IjsOpReis/
+      context: ./IJsOpReis/
       target: final
     ports:
       - 8080:8080
@@ -35,8 +35,8 @@ services:
     environment:
       - POSTGRES_DB=IjsOpReis
       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
-    expose:
-      - 5432
+    ports:
+      - 5432:5432
     healthcheck:
       test: [ "CMD", "pg_isready" ]
       interval: 10s

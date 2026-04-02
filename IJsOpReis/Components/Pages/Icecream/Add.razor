@@ -1,0 +1,112 @@
+﻿@page "/icecream/add"
+@inject AppDbContext dbContext
+@inject AllowEditingService allowEditingService
+
+@if (message is not null)
+{
+    <div class="alert alert-primary">
+        @message
+    </div>
+}
+
+<h1>Toevoegen</h1>
+
+<EditForm Model="icecreamRecord" OnValidSubmit="OnSubmit">
+
+    <label class="d-block mb-2">
+        Smaak
+        <InputText list="flavors" class="form-control" @bind-Value="icecreamRecord.Flavor"/>
+    </label>
+
+    <label class="d-block mb-2">
+        Aantal
+        <InputNumber step="0.5" class="form-control" @bind-Value="icecreamRecord.Amount" />
+    </label>
+
+    <label class="d-block mb-2">
+        Locatie
+        <InputText class="form-control" @bind-Value="icecreamRecord.Location" />
+    </label>
+
+    <label class="d-block mb-2">
+        Winkel
+        <InputText class="form-control" @bind-Value="icecreamRecord.Shop" />
+    </label>
+
+    <label class="d-block mb-2">
+        Datum
+        <input type="datetime-local" class="form-control" @bind="icecreamRecord.EatenAt" />
+    </label>
+
+    <button type="submit" class="btn btn-success">
+        Opslaan
+    </button>
+
+    <a href="/" class="btn btn-outline-secondary">
+        Terug naar lijst
+    </a>
+
+</EditForm>
+
+<datalist id="flavors">
+    @foreach (var flavor in flavors)
+    {
+        <option value="@flavor" />
+    }
+</datalist>
+
+
+@code {
+    string[] flavors = [];
+
+    bool isEditingAllowed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isEditingAllowed = allowEditingService.IsEditingAllowed();
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat momenteel uit..";
+        }
+
+        if (await dbContext.IceCreamRecords.AnyAsync()) {
+            flavors = await dbContext.IceCreamRecords.Select(i => i.Flavor).Distinct().ToArrayAsync();
+        }
+    }
+
+    string? message;
+
+    IcecreamRecord icecreamRecord = EmptyRecord();
+
+    async Task OnSubmit()
+    {
+        if (isEditingAllowed is false)
+        {
+            message = "Aanpassen staat momenteel nogsteeds uit..";
+            return;
+        }
+
+        icecreamRecord.Flavor = icecreamRecord.Flavor.NormalizeFlavorName();
+
+        dbContext.IceCreamRecords.Add(icecreamRecord);
+        await dbContext.SaveChangesAsync();
+
+        message = $"{icecreamRecord.Flavor} ijsje opgeslagen!";
+
+        icecreamRecord = EmptyRecord(icecreamRecord);
+    }
+
+    static IcecreamRecord EmptyRecord(IcecreamRecord? previousRecord = null)
+    {
+        IcecreamRecord record = new()
+            {
+                Flavor = "",
+                Location = previousRecord?.Location ?? "",
+                Shop = previousRecord?.Shop ?? "",
+                EatenAt = previousRecord?.EatenAt ?? Extensions.GetCurrentNlTime(),
+                Amount = 1,
+            };
+
+        return record;
+    }
+}
